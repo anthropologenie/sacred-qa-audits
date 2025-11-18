@@ -7,15 +7,15 @@ specialized agents deliberate on queries and synthesize collective decisions.
 from typing import Any, Dict, List, Tuple
 import statistics
 
-from ..agents.base_agent import BaseAgent
-from ..agents.krudi_agent import KrudiAgent
-from ..agents.parva_agent import ParvaAgent
-from ..agents.shanti_agent import ShantiAgent
-from ..agents.rudi_agent import RudiAgent
-from ..agents.kshana_agent import KshanaAgent
-from ..agents.maya_agent import MayaAgent
-from ..agents.smriti_agent import SmritiAgent
-from ..circuits.activation_tracker import (
+from agents.base_agent import BaseAgent
+from agents.krudi_agent import KrudiAgent
+from agents.parva_agent import ParvaAgent
+from agents.shanti_agent import ShantiAgent
+from agents.rudi_agent import RudiAgent
+from agents.kshana_agent import KshanaAgent
+from agents.maya_agent import MayaAgent
+from agents.smriti_agent import SmritiAgent
+from circuits.activation_tracker import (
     CircuitActivation,
     ParliamentDecisionTrace,
 )
@@ -155,6 +155,7 @@ class KragenticParliament:
         )
         trace.add_activation(kshana_activation)
         trace.decision = final_decision
+        trace.agent_responses = agent_responses
 
         # Phase 5: Compute confidence based on activation coherence
         trace.confidence = self._compute_confidence(trace)

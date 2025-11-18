@@ -6,7 +6,7 @@ maintaining system stability when agents disagree.
 
 from typing import Any, Dict, List
 
-from .base_agent import BaseAgent
+from agents.base_agent import BaseAgent
 
 
 class ShantiAgent(BaseAgent):
@@ -29,8 +29,8 @@ class ShantiAgent(BaseAgent):
         "tension",
         "debate",
         "versus",
-        "or",
-        "alternative",
+        "vs",
+        "competing",
     }
     BALANCE_WORDS = {
         "balance",
@@ -57,31 +57,30 @@ class ShantiAgent(BaseAgent):
 
         Returns:
             Activation strength:
-                - 0.95: High conflict detected in context
-                - 0.80: Conflict language in query
-                - 0.60: Balance/harmony language present
-                - 0.25: No conflict or balance indicators
+                - 0.85: Conflict detected (words OR context score > 0.5)
+                - 0.10: No conflict indicators (almost never fires)
         """
         query_lower = query.lower()
 
         # Check for conflict in context (between other agents)
         conflict_score = context.get("conflict_score", 0.0)
-        if conflict_score > 0.7:
-            return 0.95
+        if conflict_score > 0.5:
+            return 0.85
 
         # Check for conflict words in query
         has_conflict = any(
             word in query_lower for word in self.CONFLICT_WORDS
         )
         if has_conflict:
-            return 0.80
+            return 0.85
 
-        # Check for balance/harmony language
+        # Check for balance/harmony language (still indicates some conflict to resolve)
         has_balance = any(word in query_lower for word in self.BALANCE_WORDS)
         if has_balance:
-            return 0.60
+            return 0.70
 
-        return 0.25
+        # No conflict indicators - minimal activation
+        return 0.10
 
     def _deliberate(
         self, query: str, context: Dict[str, Any], circuits: List[str]

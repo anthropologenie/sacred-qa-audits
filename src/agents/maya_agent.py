@@ -6,7 +6,7 @@ and exploring the possibility space before decisions are made.
 
 from typing import Any, Dict, List
 
-from .base_agent import BaseAgent
+from agents.base_agent import BaseAgent
 
 
 class MayaAgent(BaseAgent):
@@ -58,30 +58,42 @@ class MayaAgent(BaseAgent):
 
         Returns:
             Activation strength:
-                - 0.90: Strong simulation/modeling request
-                - 0.75: Scenario or what-if exploration
-                - 0.60: Future outcome consideration
-                - 0.35: Present-focused query
+                - 0.85: Speculation/hypothetical questions (what if, imagine, etc.)
+                - 0.15: No speculation words
         """
         query_lower = query.lower()
 
-        # Check for explicit simulation language
-        has_simulation = any(
-            word in query_lower for word in self.SIMULATION_WORDS
-        )
-        if has_simulation:
-            return 0.90
+        # Check for strong hypothetical/speculation language
+        strong_speculation = [
+            "what if",
+            "imagine",
+            "theoretically",
+            "suppose",
+            "hypothetically",
+        ]
+        if any(phrase in query_lower for phrase in strong_speculation):
+            return 0.85
 
-        # Check for what-if or scenario language
-        if "what if" in query_lower or "scenario" in query_lower:
+        # Check for explicit simulation/modeling requests
+        if "simulate" in query_lower or "model" in query_lower:
+            # But not if it's about data models or modeling (programming)
+            if not any(
+                word in query_lower for word in ["data model", "database", "class"]
+            ):
+                return 0.85
+
+        # Check for scenario language
+        if "scenario" in query_lower:
+            return 0.80
+
+        # Future/prediction words that are too generic
+        # "will", "would", "outcome", "result" are very common in normal questions
+        # Only activate for specific prediction requests
+        if "predict" in query_lower or "forecast" in query_lower:
             return 0.75
 
-        # Check for future/outcome language
-        has_future = any(word in query_lower for word in self.FUTURE_WORDS)
-        if has_future:
-            return 0.60
-
-        return 0.35
+        # Generic future words are too common - minimal activation
+        return 0.15
 
     def _deliberate(
         self, query: str, context: Dict[str, Any], circuits: List[str]

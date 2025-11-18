@@ -6,7 +6,7 @@ and tracing lineages from past decisions and experiences.
 
 from typing import Any, Dict, List
 
-from .base_agent import BaseAgent
+from agents.base_agent import BaseAgent
 
 
 class SmritiAgent(BaseAgent):
@@ -33,13 +33,12 @@ class SmritiAgent(BaseAgent):
         "recurring",
     }
     LEARNING_WORDS = {
-        "learn",
         "lesson",
+        "lessons",
         "experience",
         "precedent",
         "similar",
         "analogy",
-        "like",
     }
 
     def __init__(self) -> None:
@@ -57,10 +56,9 @@ class SmritiAgent(BaseAgent):
 
         Returns:
             Activation strength:
-                - 0.90: Strong historical/pattern focus
-                - 0.75: Learning from past experiences
-                - 0.60: Reference to history or precedent
-                - 0.30: Novel/unprecedented situation
+                - 0.90: Explicit pattern/recurring language
+                - 0.80: History/past/lessons explicitly mentioned
+                - 0.15: No history indicators
         """
         query_lower = query.lower()
 
@@ -69,6 +67,26 @@ class SmritiAgent(BaseAgent):
         if has_pattern:
             return 0.90
 
+        # Check for strong historical keywords
+        strong_history = [
+            "history",
+            "past",
+            "previous",
+            "lessons",
+            "precedent",
+        ]
+        has_strong_history = any(
+            word in query_lower for word in strong_history
+        )
+        if has_strong_history:
+            base_activation = 0.80
+            # Boost if context has historical data
+            if context.get("history") or context.get("previous_decisions"):
+                decision_history = context.get("history", [])
+                if len(decision_history) > 0:
+                    base_activation = min(0.90, base_activation + 0.10)
+            return base_activation
+
         # Check for learning from experience
         has_learning = any(
             word in query_lower for word in self.LEARNING_WORDS
@@ -76,16 +94,19 @@ class SmritiAgent(BaseAgent):
         if has_learning:
             return 0.75
 
-        # Check for historical reference
-        has_history = any(word in query_lower for word in self.MEMORY_WORDS)
-        if has_history:
-            return 0.60
+        # Generic historical words like "before", "earlier" are too common
+        # Only activate if explicitly asking about history
+        if "remember" in query_lower:
+            return 0.70
 
-        # Check if context includes historical data
-        if context.get("history") or context.get("previous_decisions"):
-            return 0.65
+        # Check if context includes substantial historical data
+        decision_history = context.get("history", [])
+        if len(decision_history) > 3:
+            # Significant history available, mild activation
+            return 0.40
 
-        return 0.30
+        # No history indicators
+        return 0.15
 
     def _deliberate(
         self, query: str, context: Dict[str, Any], circuits: List[str]

@@ -6,7 +6,7 @@ transformation is needed in the system.
 
 from typing import Any, Dict, List
 
-from .base_agent import BaseAgent
+from agents.base_agent import BaseAgent
 
 
 class RudiAgent(BaseAgent):
@@ -57,10 +57,9 @@ class RudiAgent(BaseAgent):
 
         Returns:
             Activation strength:
-                - 0.90: Strong need for adaptation/transformation
-                - 0.75: Learning or improvement focus
-                - 0.55: Change or modification suggested
-                - 0.35: Stable/static context
+                - 0.90: Strong transformation/mutation language
+                - 0.80: Adaptation/evolution/change focus
+                - 0.15: No transformation indicators
         """
         query_lower = query.lower()
 
@@ -72,21 +71,34 @@ class RudiAgent(BaseAgent):
         if has_transformation:
             return 0.90
 
-        # Check for learning language
-        has_learning = any(
-            word in query_lower for word in self.LEARNING_WORDS
+        # Check for strong adaptation keywords
+        strong_adaptation_words = ["adapt", "evolve", "transform"]
+        has_strong_adaptation = any(
+            word in query_lower for word in strong_adaptation_words
         )
-        if has_learning:
-            return 0.75
+        if has_strong_adaptation:
+            return 0.80
 
-        # Check for adaptation language
-        has_adaptation = any(
-            word in query_lower for word in self.ADAPTATION_WORDS
+        # Check for learning/improvement in context of system evolution
+        if "learn" in query_lower or "evolve" in query_lower:
+            return 0.80
+
+        # Generic change words are too common - lower activation
+        generic_change = any(
+            word in query_lower
+            for word in ["change", "modify", "adjust", "update"]
         )
-        if has_adaptation:
-            return 0.55
+        if generic_change:
+            # Only activate if it's about system change, not data change
+            if any(
+                word in query_lower
+                for word in ["system", "architecture", "approach", "strategy"]
+            ):
+                return 0.70
+            return 0.15
 
-        return 0.35
+        # No transformation indicators
+        return 0.15
 
     def _deliberate(
         self, query: str, context: Dict[str, Any], circuits: List[str]

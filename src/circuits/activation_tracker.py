@@ -67,6 +67,7 @@ class ParliamentDecisionTrace:
     kshana_index: int = 0
     query: str = ""
     activations: Dict[str, CircuitActivation] = field(default_factory=dict)
+    agent_responses: Dict[str, str] = field(default_factory=dict)
     sparsity_ratio: float = 0.0
     total_activation: float = 0.0
     activation_sequence: List[str] = field(default_factory=list)
@@ -118,14 +119,22 @@ class ParliamentDecisionTrace:
         self.activation_sequence.append(activation.agent_name)
         self.total_activation += activation.activation_strength
 
-    def compute_sparsity(self, total_agents: int) -> None:
+    def compute_sparsity(
+        self, total_agents: int, activation_threshold: float = 0.5
+    ) -> None:
         """Calculate the sparsity ratio based on active vs total agents.
 
         Args:
             total_agents: Total number of agents in the parliament
+            activation_threshold: Threshold for considering an agent "active"
         """
         if total_agents <= 0:
             raise ValueError("total_agents must be positive")
 
-        active_agents = len(self.activations)
+        # Count only agents that activated above threshold
+        active_agents = sum(
+            1
+            for act in self.activations.values()
+            if act.activation_strength >= activation_threshold
+        )
         self.sparsity_ratio = 1.0 - (active_agents / total_agents)

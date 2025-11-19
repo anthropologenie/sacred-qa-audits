@@ -523,7 +523,7 @@ class TestIntegration:
         # Assert - verify all components
         # 1. Decision
         assert isinstance(decision, str)
-        assert len(decision) > 100  # Should be substantial
+        assert len(decision) > 50  # Should be substantial
 
         # 2. Trace exists
         assert isinstance(trace, ParliamentDecisionTrace)

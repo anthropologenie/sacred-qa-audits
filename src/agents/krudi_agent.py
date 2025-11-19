@@ -6,7 +6,7 @@ in reality, embodied constraints, and sovereignty principles.
 
 from typing import Any, Dict, List
 
-from agents.base_agent import BaseAgent
+from .base_agent import BaseAgent
 
 
 class KrudiAgent(BaseAgent):
@@ -38,6 +38,9 @@ class KrudiAgent(BaseAgent):
         Krudi activates most strongly when speculation meets decision-making,
         as these queries most need reality grounding.
 
+        INTEGRATION-AWARE: If context contains user skills and job requirements,
+        Krudi activates strongly to provide reality-grounded skill gap analysis.
+
         Args:
             query: The question or task to evaluate
             context: Additional contextual information
@@ -50,7 +53,21 @@ class KrudiAgent(BaseAgent):
                 - 0.15: Simple factual queries (minimal intervention)
         """
         query_lower = query.lower()
+        strength = 0.0
 
+        # INTEGRATION: Check for job evaluation context (user skills + requirements)
+        if "user_skills" in context and "job_requirements" in context:
+            strength += 0.4  # Strong activation for skill reality checks
+
+        # INTEGRATION: Check for skill gap analysis context
+        if "skill_gap_analysis" in context:
+            strength += 0.3  # Additional activation for gap analysis
+
+        # If integration context triggered high activation, return immediately
+        if strength >= 0.7:
+            return min(strength, 1.0)
+
+        # EXISTING LOGIC: Keyword-based activation
         # Check for simple factual queries (low word count, no decision words)
         word_count = len(query_lower.split())
         has_decision = any(word in query_lower for word in self.DECISION_WORDS)
@@ -60,26 +77,26 @@ class KrudiAgent(BaseAgent):
 
         # Simple factual queries - minimal grounding needed
         if word_count < 10 and not has_decision and not has_speculation:
-            return 0.15
+            return max(0.15, strength)
 
         # Implementation questions need strong reality checks
         if "implement" in query_lower or "build" in query_lower:
             if has_speculation:
-                return 0.95
-            return 0.85
+                return max(0.95, strength)
+            return max(0.85, strength)
 
         # Decision questions with should/can
         if "should" in query_lower or "can we" in query_lower:
             if has_speculation:
-                return 0.95
-            return 0.75
+                return max(0.95, strength)
+            return max(0.75, strength)
 
         # Speculation without decision
         if has_speculation:
-            return 0.60
+            return max(0.60, strength)
 
         # General query - minimal grounding
-        return 0.15
+        return max(0.15, strength)
 
     def _deliberate(
         self, query: str, context: Dict[str, Any], circuits: List[str]
@@ -89,6 +106,9 @@ class KrudiAgent(BaseAgent):
         Applies reality anchoring and checks for embodied and sovereignty
         constraints based on query content.
 
+        INTEGRATION-AWARE: If context contains user skills and job requirements,
+        performs real skill gap analysis based on actual interview data.
+
         Args:
             query: The question or task to process
             context: Additional contextual information
@@ -97,6 +117,17 @@ class KrudiAgent(BaseAgent):
         Returns:
             Grounding-focused response emphasizing reality constraints
         """
+        # INTEGRATION: Check for job evaluation context with real skill data
+        if "user_skills" in context and "job_requirements" in context:
+            circuits.append("skill_reality_check")
+            return self._perform_skill_gap_analysis(
+                context["user_skills"],
+                context["job_requirements"],
+                context.get("learning_gaps", []),
+                circuits,
+            )
+
+        # EXISTING LOGIC: Keyword-based grounding
         query_lower = query.lower()
 
         # Check if this is a factual query that needs no grounding
@@ -264,6 +295,218 @@ class KrudiAgent(BaseAgent):
             return "Reality check: Evaluate actual resources, timeline constraints, and team capacity. Define success criteria and rollback plan."
 
         return "Reality anchor: Ground in concrete steps, measurable outcomes, actual resource availability."
+
+    def _perform_skill_gap_analysis(
+        self,
+        user_skills: Dict[str, float],
+        job_requirements: List[str],
+        learning_gaps: List[Dict[str, Any]],
+        circuits: List[str],
+    ) -> str:
+        """Perform reality-grounded skill gap analysis using actual user data.
+
+        This method uses real interview performance data to assess job fit.
+
+        Args:
+            user_skills: Dictionary of skill -> rating (1-5) from interview data
+            job_requirements: List of required skills/technologies
+            learning_gaps: List of weak areas from learning data
+            circuits: Active circuits list (modified in place)
+
+        Returns:
+            Detailed skill gap analysis with realistic assessment
+        """
+        circuits.append("integration_skill_analysis")
+
+        # Analyze each requirement against user skills
+        gaps = []
+        matches = []
+        weak_areas = []
+
+        # Map common requirement patterns to skill categories
+        skill_mapping = {
+            "sql": "Technical SQL",
+            "python": "Python",
+            "data warehouse": "Data Warehouse",
+            "etl": "ETL Tools",
+            "system design": "System Design",
+            "coding": "Coding",
+            "cloud": "Cloud Services",
+        }
+
+        for requirement in job_requirements:
+            req_lower = requirement.lower().strip()
+            matched_skill = None
+            user_rating = None
+
+            # Try to match requirement to a known skill
+            for pattern, skill_name in skill_mapping.items():
+                if pattern in req_lower:
+                    matched_skill = skill_name
+                    user_rating = user_skills.get(skill_name)
+                    break
+
+            # Determine proficiency level from requirement text
+            required_level = self._infer_required_level(req_lower)
+
+            if user_rating is not None:
+                gap = required_level - user_rating
+                if gap > 0.5:
+                    gaps.append(
+                        {
+                            "skill": matched_skill,
+                            "user_rating": user_rating,
+                            "required_level": required_level,
+                            "gap": gap,
+                            "requirement": requirement,
+                        }
+                    )
+                else:
+                    matches.append(
+                        {
+                            "skill": matched_skill,
+                            "user_rating": user_rating,
+                            "required_level": required_level,
+                        }
+                    )
+
+        # Identify weak areas from learning gaps
+        for gap in learning_gaps:
+            if gap.get("current_rating") and gap["current_rating"] < 2.5:
+                weak_areas.append(
+                    {
+                        "name": gap["name"],
+                        "category": gap.get("category", "Unknown"),
+                        "rating": gap["current_rating"],
+                    }
+                )
+
+        # Calculate overall skill readiness
+        total_reqs = len(job_requirements)
+        matched_count = len(matches)
+        gap_count = len(gaps)
+        skill_readiness = (
+            (matched_count / total_reqs * 100) if total_reqs > 0 else 0
+        )
+
+        # Estimate callback probability based on gaps
+        if gap_count == 0:
+            callback_probability = "60-75%"
+        elif gap_count <= 2 and all(g["gap"] < 1.5 for g in gaps):
+            callback_probability = "35-50%"
+        elif gap_count <= 3:
+            callback_probability = "15-25%"
+        else:
+            callback_probability = "5-10%"
+
+        # Build the response
+        response_parts = ["Reality check from your interview data:\n"]
+
+        # Show specific skill gaps
+        if gaps:
+            for gap_info in gaps[:5]:  # Show top 5 gaps
+                response_parts.append(
+                    f"  - {gap_info['skill']}: You rated {gap_info['user_rating']:.1f}/5, "
+                    f"Role requires {self._level_name(gap_info['required_level'])} "
+                    f"({gap_info['required_level']:.1f}+/5) → Gap: {gap_info['gap']:.1f} points"
+                )
+
+        # Show weak areas
+        if weak_areas:
+            response_parts.append("\n  Weak areas identified:")
+            for weak in weak_areas[:3]:  # Show top 3 weak areas
+                response_parts.append(
+                    f"  - {weak['category']}: Current rating {weak['rating']:.1f}/5 → Critical weakness"
+                )
+
+        # Show matches
+        if matches:
+            response_parts.append(
+                f"\n  Strengths: {len(matches)} requirement(s) matched"
+            )
+
+        # Add metrics
+        response_parts.append(
+            f"\n  Skill readiness: {skill_readiness:.0f}% ({gap_count} significant gaps identified)"
+        )
+        response_parts.append(
+            f"  Realistic callback probability based on gaps: {callback_probability}"
+        )
+
+        # Add recommendation
+        response_parts.append("\n  Recommendation: ")
+        if gap_count == 0:
+            response_parts.append(
+                "Good skill alignment. Apply with confidence and prepare for technical depth."
+            )
+        elif gap_count <= 2:
+            response_parts.append(
+                f"Focus on strengthening {gaps[0]['skill']} before applying. "
+                f"Consider roles requiring {self._level_name(gaps[0]['user_rating'])} level "
+                f"where you're already strong."
+            )
+        else:
+            top_gaps = sorted(gaps, key=lambda x: x["gap"], reverse=True)[:2]
+            gap_names = " and ".join(g["skill"] for g in top_gaps)
+            response_parts.append(
+                f"Focus on strengthening {gap_names} fundamentals before applying. "
+                f"Target roles requiring Intermediate level (3/5) where you're closer to ready."
+            )
+
+        return "\n".join(response_parts)
+
+    def _infer_required_level(self, requirement_text: str) -> float:
+        """Infer required proficiency level from requirement description.
+
+        Args:
+            requirement_text: Lowercased requirement text
+
+        Returns:
+            Required level on 1-5 scale
+        """
+        if any(
+            word in requirement_text
+            for word in ["senior", "expert", "advanced", "deep"]
+        ):
+            return 4.5
+        elif any(
+            word in requirement_text
+            for word in ["strong", "proficient", "solid"]
+        ):
+            return 4.0
+        elif any(
+            word in requirement_text
+            for word in ["intermediate", "working knowledge", "good"]
+        ):
+            return 3.0
+        elif any(
+            word in requirement_text
+            for word in ["basic", "familiarity", "exposure"]
+        ):
+            return 2.0
+        else:
+            # Default to intermediate for unspecified
+            return 3.5
+
+    def _level_name(self, level: float) -> str:
+        """Convert numeric level to descriptive name.
+
+        Args:
+            level: Numeric proficiency level (1-5)
+
+        Returns:
+            Descriptive level name
+        """
+        if level >= 4.5:
+            return "Expert"
+        elif level >= 4.0:
+            return "Advanced"
+        elif level >= 3.0:
+            return "Intermediate"
+        elif level >= 2.0:
+            return "Basic"
+        else:
+            return "Beginner"
 
     def _analyze_reality_constraints(
         self, query: str, context: Dict[str, Any]

@@ -4,18 +4,18 @@ This module implements the parliamentary governance layer where multiple
 specialized agents deliberate on queries and synthesize collective decisions.
 """
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import statistics
 
-from agents.base_agent import BaseAgent
-from agents.krudi_agent import KrudiAgent
-from agents.parva_agent import ParvaAgent
-from agents.shanti_agent import ShantiAgent
-from agents.rudi_agent import RudiAgent
-from agents.kshana_agent import KshanaAgent
-from agents.maya_agent import MayaAgent
-from agents.smriti_agent import SmritiAgent
-from circuits.activation_tracker import (
+from ..agents.base_agent import BaseAgent
+from ..agents.krudi_agent import KrudiAgent
+from ..agents.parva_agent import ParvaAgent
+from ..agents.shanti_agent import ShantiAgent
+from ..agents.rudi_agent import RudiAgent
+from ..agents.kshana_agent import KshanaAgent
+from ..agents.maya_agent import MayaAgent
+from ..agents.smriti_agent import SmritiAgent
+from ..circuits.activation_tracker import (
     CircuitActivation,
     ParliamentDecisionTrace,
 )
@@ -36,14 +36,26 @@ class KragenticParliament:
     The parliament manages the activation flow, tracks decision lineages,
     measures dharmic alignment, and maintains decision history.
 
+    INTEGRATION-AWARE: If an integration is provided, Parliament will
+    automatically detect query types and enrich context with relevant data.
+
     Attributes:
         agents: Dictionary of all agents in the parliament
         kshana_counter: Counter for decision moments (kshana indices)
         decision_history: List of all previous decision traces
+        integration: Optional external data integration (e.g., JobsDBIntegration)
     """
 
-    def __init__(self) -> None:
-        """Initialize the Kragentic Parliament with all seven agents."""
+    def __init__(self, integration: Optional[Any] = None) -> None:
+        """Initialize the Kragentic Parliament with all seven agents.
+
+        Args:
+            integration: Optional integration for external data (e.g., JobsDBIntegration).
+                         If provided, Parliament will auto-enrich context for queries.
+        """
+        # Store integration reference
+        self.integration = integration
+
         # Initialize all agents
         self.agents: Dict[str, BaseAgent] = {
             "krudi": KrudiAgent(),
@@ -68,6 +80,7 @@ class KragenticParliament:
 
         This is the main entry point for the parliament. It orchestrates
         the entire decision-making process:
+            0. Auto-enrich context from integration (if available)
             1. Create decision trace
             2. Activate all agents
             3. Record activations
@@ -77,6 +90,10 @@ class KragenticParliament:
             7. Detect patterns
             8. Extract lineage
             9. Store in history
+
+        INTEGRATION-AWARE: If an integration was provided at initialization,
+        this method will automatically detect the query type and fetch
+        relevant context data, enriching it for all agents.
 
         Args:
             query: The question or task to deliberate on
@@ -88,6 +105,30 @@ class KragenticParliament:
         # Initialize context if None
         if context is None:
             context = {}
+
+        # INTEGRATION: Auto-enrich context if integration available
+        if self.integration:
+            try:
+                # Detect query type
+                query_type = self._detect_query_type(query)
+
+                # Fetch base context for this query type
+                integration_context = self.integration.fetch_context(
+                    query_type, query=query
+                )
+                context.update(integration_context)
+
+                # Enrich with agent-specific data
+                for agent_name in ["krudi", "parva", "smriti"]:
+                    agent_context = self.integration.enrich_agent_context(
+                        agent_name, context
+                    )
+                    context.update(agent_context)
+
+            except Exception as e:
+                # Integration failed, continue without it
+                # (Don't break existing functionality)
+                pass
 
         # Increment kshana counter
         self.kshana_counter += 1
@@ -492,6 +533,83 @@ class KragenticParliament:
             }
 
         return stats
+
+    def _detect_query_type(self, query: str) -> str:
+        """Detect query type for integration context fetching.
+
+        This method analyzes the query to determine what type of integration
+        context should be fetched. Used when integration is enabled.
+
+        Args:
+            query: The question or task being asked
+
+        Returns:
+            Query type string for integration.fetch_context():
+                - 'job_evaluation': Job application decision queries
+                - 'interview_prep': Interview preparation queries
+                - 'learning_priority': Learning/study priority queries
+                - 'skill_assessment': Skill readiness queries
+                - 'general': Default/unknown query type
+        """
+        query_lower = query.lower()
+
+        # Job application queries
+        if any(
+            phrase in query_lower
+            for phrase in [
+                "should i apply",
+                "apply to",
+                "application",
+                "job at",
+                "role at",
+                "position at",
+            ]
+        ):
+            return "job_evaluation"
+
+        # Interview preparation queries
+        if any(
+            phrase in query_lower
+            for phrase in [
+                "interview",
+                "prepare for",
+                "practice",
+                "questions about",
+                "asked about",
+            ]
+        ):
+            return "interview_prep"
+
+        # Learning/study queries
+        if any(
+            phrase in query_lower
+            for phrase in [
+                "study",
+                "learn",
+                "what should i",
+                "focus on",
+                "improve",
+                "practice",
+            ]
+        ):
+            return "learning_priority"
+
+        # Skill assessment queries
+        if any(
+            phrase in query_lower
+            for phrase in [
+                "skill",
+                "ready",
+                "qualified",
+                "am i",
+                "can i",
+                "do i have",
+            ]
+        ):
+            return "skill_assessment"
+
+        # Default to general
+        return "general"
 
     def __repr__(self) -> str:
         """Return string representation of the parliament."""

@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
-from circuits.activation_tracker import CircuitActivation
+from ..circuits.activation_tracker import CircuitActivation
 
 
 class BaseAgent(ABC):
